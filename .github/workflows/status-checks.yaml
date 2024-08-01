@@ -1,0 +1,13 @@
+name: Status Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  dummy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Hello, World!"
