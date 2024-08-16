@@ -3,7 +3,8 @@
 
 #include <pgmspace.h>
 
-
+static const char WIFI_SSID[] = "NAME OF WIFI GOES HERE";
+static const char WIFI_PWD[] = "PASSWORD GOES HERE";
 
 
 // AWS Thing ID
