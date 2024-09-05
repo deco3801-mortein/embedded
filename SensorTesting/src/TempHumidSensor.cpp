@@ -1,6 +1,6 @@
 #include "TempHumidSensor.hpp"
 #include "defines.hpp"
-
+#if BOARD_TYPE == 0
 TempHumidSensor::TempHumidSensor(uint8_t pin)
     : dht{pin, DHTTYPE} { }
 
@@ -48,3 +48,4 @@ float TempHumidSensor::read_humid()
     dht.humidity().getEvent(&event);
     return event.relative_humidity;
 }
+#endif
