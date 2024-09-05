@@ -95,10 +95,10 @@ void loop() {
     if (millis() % delayTime == 0) {
         int moisture = analogRead(MOISTURE_PIN);
         moisture = map(moisture, MIN_MOISTURE, MAX_MOISTURE, 0, 100);
-#if DEBUG
+// #if DEBUG
         Serial.print("moisture: ");
         Serial.println(moisture);
-#endif DEBUG
+// #endif DEBUG
         int sunlight = analogRead(UV_PIN);
         // Serial.print("sunlight: ");
         // Serial.println(sunlight);
@@ -145,5 +145,3 @@ void receivedMessage(const char *message) {
     }
     Serial.println((const char *)doc["message"]);
 }
-
-
