@@ -129,3 +129,12 @@ void loop() {
         // delay(500);
     }
 }
+
+
+// void receivedMessage(const char *message) {
+//     JsonDocument doc;
+//     deserializeJson(doc, message);
+//     int recieved_info = doc["sent_command"];
+//     Serial.println((const char *)doc["message"]);
+//     // Code to do what you want to do with the recieved info
+// }
