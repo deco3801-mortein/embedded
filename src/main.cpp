@@ -120,7 +120,7 @@ void loop() {
         doc["Temperature"] = temperature;
         doc["IsVibrating"] = true;
         serializeJson(doc, message);
-        sendMessage("test_topic", message);
+        sendMessage("iot/test", message);
         // frequency = frequency % 300 + 100;
         // if (frequency == 100) {
         //     intensity = (intensity + 25) % 150;
