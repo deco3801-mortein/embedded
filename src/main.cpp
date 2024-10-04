@@ -109,17 +109,18 @@ void loop() {
         char message[500];
         // Serial.println("sending test message");
         JsonDocument doc;
-        doc["sensor_id"] = AWS_THING_ID;
-        doc["timestamp"] = getTime();
-        doc["moisture"] = moisture;
+        doc["DeviceId"] = AWS_THING_ID;
+        doc["Timestamp"] = getTime();
+        doc["Moisture"] = moisture;
 #if BOARD_TYPE == 1
-        doc["sunlight"] = uv;
+        doc["Sunlight"] = uv;
 #else
-        doc["sunlight"] = light;
+        doc["Sunlight"] = light;
 #endif
-        doc["temp"] = temperature;
+        doc["Temperature"] = temperature;
+        doc["IsVibrating"] = true;
         serializeJson(doc, message);
-        sendMessage("test_topic", message);
+        sendMessage("iot/test", message);
         // frequency = frequency % 300 + 100;
         // if (frequency == 100) {
         //     intensity = (intensity + 25) % 150;
