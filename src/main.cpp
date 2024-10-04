@@ -16,7 +16,7 @@
 int delayTime = 1000;
 bool success = true;
 
-// void receivedMessage(const char *message);
+void receivedMessage(const char *message);
 
 AWS_Credentials credentials{AWS_ROOT_CA1, AWS_CERT, 
 AWS_PRIVATE_KEY, AWS_IOT_ENDPOINT, AWS_IOT_MQTT_PORT, AWS_THING_ID};
@@ -63,16 +63,19 @@ void setup() {
     Serial.println("Device initialisation complete.");
     Serial.println("Attempting connection to WIFI & MQTT.");
     success = connectToWiFi(WIFI_SSID, WIFI_PWD) && setTime() && connectToMQTT_Broker(credentials) 
-    // && subscribe("test_sub_topic", receivedMessage)
+    && subscribe(AWS_THING_ID, receivedMessage)
     ;
+
+    linearResonator.set_frequency(100.0);
+    linearResonator.set_intensity(0);
 }
 
 void loop() {
     checkIncoming();
     if (millis() % delayTime == 0) {
         char log[150];
-        static int frequency = 100;
-        static uint8_t intensity = 0;
+        // static int frequency = 100;
+        // static uint8_t intensity = 0;
 
         float moisture;
         float temperature;
@@ -102,8 +105,8 @@ void loop() {
         #endif
         Serial.println(log);
 
-        linearResonator.set_frequency((float) frequency);
-        linearResonator.set_intensity(intensity);
+        // linearResonator.set_frequency((float) frequency);
+        // linearResonator.set_intensity(intensity);
         
 
         char message[500];
@@ -132,10 +135,15 @@ void loop() {
 }
 
 
-// void receivedMessage(const char *message) {
-//     JsonDocument doc;
-//     deserializeJson(doc, message);
-//     int recieved_info = doc["sent_command"];
-//     Serial.println((const char *)doc["message"]);
-//     // Code to do what you want to do with the recieved info
-// }
+void receivedMessage(const char *message) {
+    JsonDocument doc;
+    deserializeJson(doc, message);
+    bool vibrate = doc["Vibrate"];
+    if (vibrate) {
+        linearResonator.set_intensity(100);
+    } else {
+        linearResonator.set_intensity(0);
+    }
+
+    Serial.println(message);
+}
