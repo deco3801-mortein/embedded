@@ -17,7 +17,7 @@
 int delayTime = 1000;
 bool success = true;
 
-void receivedMessage(const char *message);
+// void receivedMessage(const char *message);
 
 AWS_Credentials credentials{AWS_ROOT_CA1, AWS_CERT, 
 AWS_PRIVATE_KEY, AWS_IOT_ENDPOINT, AWS_IOT_MQTT_PORT, AWS_THING_ID};
@@ -37,116 +37,115 @@ AdaLRA linearResonator{ADALRA_PWM_PIN};
 LEDController leds{};
 
 void setup() {
+    uint8_t err;
+
+    Serial.begin(115200);
     while (!Serial) delay(100);
     Serial.println("Initialising device.");
+
+    Wire.begin();
+    Serial.println("I2C interface intialised.");
+
+    moistureSensor.init();
+    linearResonator.init();
+
+    #if BOARD_TYPE == 0
+    err = lightSensor.init();
+    if (err) {
+        Serial.println("Failed to initialise light sensor device.");
+        return;
+    }
+    tempHumidSensor.init();
+    tempHumidSensor.print_sensor_info();
+    #elif BOARD_TYPE == 1
+    uvSensor.init();
+    soilTempSensor.init();
+    #endif
+    
+
+    Serial.println("Device initialisation complete.");
+    Serial.println("Attempting connection to WIFI & MQTT.");
+    success = connectToWiFi(WIFI_SSID, WIFI_PWD) && setTime() && connectToMQTT_Broker(credentials) 
+    // && subscribe(AWS_THING_ID, receivedMessage)
+    ;
+
+    linearResonator.set_frequency(100.0);
+    linearResonator.set_intensity(0);
+
+#if BOARD_TYPE == 0
     leds.init();
-    Serial.println("Finished initialising device.");
+#endif
 }
 
 void loop() {
-    leds.test_loop();
+    checkIncoming();
+    if (millis() % delayTime == 0) {
+        char log[150];
+        // static int frequency = 100;
+        // static uint8_t intensity = 0;
+
+        float moisture;
+        float temperature;
+        #if BOARD_TYPE == 0
+        float humidity;
+        uint16_t light;
+        #elif BOARD_TYPE == 1
+        float uv;
+        #endif
+        
+        moisture = moistureSensor.read();
+
+        #if BOARD_TYPE == 0
+        light = lightSensor.read();
+        temperature = tempHumidSensor.read_temp();
+        humidity = tempHumidSensor.read_humid();
+        #elif BOARD_TYPE == 1
+        uv = uvSensor.read_UV();
+        temperature = soilTempSensor.read_temp();
+        #endif
+
+        #if BOARD_TYPE == 0
+        sprintf(log, "Moisture: %.2f%%,\tTemperature: %.2f°C,\tLight: %d,\tHumidity: %.2f", 
+            moisture, temperature, light, humidity);
+        uint8_t light_level = light / 1000;
+        if (light_level > 10) light_level = 10;
+        uint8_t moisture_level = (uint8_t) (moisture / 10.0);
+        if (moisture_level > 10) moisture_level = 10;
+        leds.set_bar(0, light_level);
+        leds.set_bar(1, moisture_level);
+        #elif BOARD_TYPE == 1
+        sprintf(log, "Moisture: %.2f%%,\tTemperature: %.2f°C,\tUV: %d", moisture, temperature, uv);
+        #endif
+        Serial.println(log);
+
+        // linearResonator.set_frequency((float) frequency);
+        // linearResonator.set_intensity(intensity);
+        
+
+        char message[500];
+        // Serial.println("sending test message");
+        JsonDocument doc;
+        doc["DeviceId"] = AWS_THING_ID;
+        doc["Timestamp"] = getTime();
+        doc["Moisture"] = moisture;
+#if BOARD_TYPE == 1
+        doc["Sunlight"] = uv;
+#else
+        doc["Sunlight"] = light;
+#endif
+        doc["Temperature"] = temperature;
+        doc["IsVibrating"] = true;
+        serializeJson(doc, message);
+        sendMessage("iot/test", message);
+        // frequency = frequency % 300 + 100;
+        // if (frequency == 100) {
+        //     intensity = (intensity + 25) % 150;
+        // }
+
+
+        // delay(500);
+    }
 }
-
-// void setup() {
-//     uint8_t err;
-
-//     Serial.begin(115200);
-//     while (!Serial) delay(100);
-//     Serial.println("Initialising device.");
-
-//     Wire.begin();
-//     Serial.println("I2C interface intialised.");
-
-//     moistureSensor.init();
-//     linearResonator.init();
-
-//     #if BOARD_TYPE == 0
-//     err = lightSensor.init();
-//     if (err) {
-//         Serial.println("Failed to initialise light sensor device.");
-//         return;
-//     }
-//     tempHumidSensor.init();
-//     tempHumidSensor.print_sensor_info();
-//     #elif BOARD_TYPE == 1
-//     uvSensor.init();
-//     soilTempSensor.init();
-//     #endif
-    
-
-//     Serial.println("Device initialisation complete.");
-//     Serial.println("Attempting connection to WIFI & MQTT.");
-//     success = connectToWiFi(WIFI_SSID, WIFI_PWD) && setTime() && connectToMQTT_Broker(credentials) 
-//     && subscribe(AWS_THING_ID, receivedMessage)
-//     ;
-
-//     linearResonator.set_frequency(100.0);
-//     linearResonator.set_intensity(0);
-// }
-
-// void loop() {
-//     checkIncoming();
-//     if (millis() % delayTime == 0) {
-//         char log[150];
-//         // static int frequency = 100;
-//         // static uint8_t intensity = 0;
-
-//         float moisture;
-//         float temperature;
-//         #if BOARD_TYPE == 0
-//         float humidity;
-//         uint16_t light;
-//         #elif BOARD_TYPE == 1
-//         float uv;
-//         #endif
-        
-//         moisture = moistureSensor.read();
-
-//         #if BOARD_TYPE == 0
-//         light = lightSensor.read();
-//         temperature = tempHumidSensor.read_temp();
-//         humidity = tempHumidSensor.read_humid();
-//         #elif BOARD_TYPE == 1
-//         uv = uvSensor.read_UV();
-//         temperature = soilTempSensor.read_temp();
-//         #endif
-
-//         #if BOARD_TYPE == 0
-//         sprintf(log, "Moisture: %.2f%%,\tTemperature: %.2f°C,\tLight: %d,\tHumidity: %.2f", 
-//             moisture, temperature, light, humidity);
-//         #elif BOARD_TYPE == 1
-//         sprintf(log, "Moisture: %.2f%%,\tTemperature: %.2f°C,\tUV: %d", moisture, temperature, uv);
-//         #endif
-//         Serial.println(log);
-
-//         // linearResonator.set_frequency((float) frequency);
-//         // linearResonator.set_intensity(intensity);
-        
-
-//         char message[500];
-//         // Serial.println("sending test message");
-//         JsonDocument doc;
-//         doc["DeviceId"] = AWS_THING_ID;
-//         doc["Timestamp"] = getTime();
-//         doc["Moisture"] = moisture;
-// #if BOARD_TYPE == 1
-//         doc["Sunlight"] = uv;
-// #else
-//         doc["Sunlight"] = light;
-// #endif
-//         doc["Temperature"] = temperature;
-//         doc["IsVibrating"] = true;
-//         serializeJson(doc, message);
-//         sendMessage("iot/test", message);
-//         // frequency = frequency % 300 + 100;
-//         // if (frequency == 100) {
-//         //     intensity = (intensity + 25) % 150;
-//         // }
-
-
-//         // delay(500);
-//     }
-// }
 
 
 // void receivedMessage(const char *message) {
