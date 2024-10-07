@@ -77,7 +77,7 @@ bool setTime() {
 
 const char *getTime() {
     time_t now = time(nullptr);
-    strftime(timestamp, MAX_TIMESTAMP_LENGTH, "%Y-%m-%d %H:%M:%S", localtime(&now));
+    strftime(timestamp, MAX_TIMESTAMP_LENGTH, "%Y-%m-%dT%H:%M:%SZ", localtime(&now));
     return timestamp;
 }
 
