@@ -14,6 +14,12 @@
 #include "secrets.h"
 #include "time.h"
 
+#include <WiFi.h>
+#include <WiFiAP.h>
+#include <WebServer.h>
+
+#define SETUP_BTN_PIN B0
+
 int delayTime = 1000;
 bool success = true;
 
@@ -36,12 +42,65 @@ AdaLRA linearResonator{ADALRA_PWM_PIN};
 
 LEDController leds{};
 
+WebServer server(80);
+uint32_t button_start;
+bool button_pressed;
+
+static const String page{R"EOF(<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Device</title>
+</head>
+<body>
+    <h1>Set Up Device</h1>
+    <form action="/settings" method="post">
+        <p>
+            <label for="wifissid">WiFi SSID</label>
+            <input type="text" name="wifissid" id="wifissid">
+        </p>
+        <p>
+            <label for="wifipass">WiFi Password</label>
+            <input type="text" name="wifipass" id="wifipass">
+        </p>
+        <p>
+            <label for="devname">Device Name</label>
+            <input type="text" name="devname" id="devname">
+        </p>
+        <p>
+            <input type="submit" value="Set">
+        </p>
+    </form>
+</body>
+</html>)EOF"};
+
+void handleRoot() {
+    server.send(200, "text/html", page);
+}
+
+void handleForm() {
+    Serial.println(server.arg("wifissid"));
+    // server.send(200, "text/html", page);
+    server.sendHeader("Location", "/");
+    server.send(303, "text/plain", "");
+}
+
 void setup() {
     uint8_t err;
 
     Serial.begin(115200);
     while (!Serial) delay(100);
     Serial.println("Initialising device.");
+
+#if BOARD_TYPE == 0
+    leds.init();
+    leds.set_rgb(true, false, false);
+
+    button_start = millis();
+    button_pressed = false;
+    pinMode(LED_RED, INPUT_PULLUP);
+#endif
 
     Wire.begin();
     Serial.println("I2C interface intialised.");
@@ -65,19 +124,62 @@ void setup() {
 
     Serial.println("Device initialisation complete.");
     Serial.println("Attempting connection to WIFI & MQTT.");
+    leds.set_rgb(true, true, false);
     success = connectToWiFi(WIFI_SSID, WIFI_PWD) && setTime() && connectToMQTT_Broker(credentials) 
     // && subscribe(AWS_THING_ID, receivedMessage)
     ;
 
+    if (success) {
+        leds.set_rgb(false, true, false);
+    } else {
+        leds.set_rgb(true, false, false);
+    }
+
     linearResonator.set_frequency(100.0);
     linearResonator.set_intensity(0);
 
-#if BOARD_TYPE == 0
-    leds.init();
-#endif
 }
 
 void loop() {
+    if (button_pressed) {
+        if (digitalRead(LED_RED) != 0) {
+            button_pressed = false;
+        } else if (millis() - button_start > 2000) {
+            Serial.println("Going into setup mode.");
+            leds.set_rgb(false, true, true);
+            if (!WiFi.disconnect()) {
+                Serial.println("Failed to disconnect from the WiFi");
+            }
+            if (!WiFi.softAP("VibeGrowSetup", "vibegrow1234")) {
+                Serial.println("Soft AP creation failed.");
+                return;
+            }
+
+            IPAddress myIP = WiFi.softAPIP();
+            Serial.print("AP IP address: ");
+            Serial.println(myIP);
+
+            server.on("/", handleRoot);
+            server.on("/settings", HTTP_POST, handleForm);
+            server.begin();
+            
+            while (!(millis() - button_start > 5000 && digitalRead(LED_RED) == 0)) {
+                server.handleClient();
+                delay(2);
+            }
+
+            server.close();
+            WiFi.softAPdisconnect();
+
+            ESP.restart(); // Restart the device from scratch
+        }
+    } else {
+        if (digitalRead(LED_RED) == 0) {
+            button_pressed = true;
+            button_start = millis();
+        }
+    }
+
     checkIncoming();
     if (millis() % delayTime == 0) {
         char log[150];

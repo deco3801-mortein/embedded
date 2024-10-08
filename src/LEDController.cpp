@@ -83,6 +83,12 @@ void LEDController::set_rgb(bool red, bool green, bool blue)
     send_command(MAX7219_DIGIT_3_REG, digit_values[3]);
 }
 
+void LEDController::toggle_rgb(bool red, bool green, bool blue)
+{
+    digit_values[3] ^= (red << 0) | (green << 1) | (blue << 2);
+    send_command(MAX7219_DIGIT_3_REG, digit_values[3]);
+}
+
 void LEDController::test_loop()
 {
     for (int i = 0; i <= 10; ++i) {
