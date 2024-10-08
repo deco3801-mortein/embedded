@@ -18,6 +18,7 @@
 #include <WiFiAP.h>
 #include <WebServer.h>
 #include <Preferences.h>
+#include <HTTPClient.h>
 
 #define SETUP_BTN_PIN B0
 
@@ -162,6 +163,23 @@ void setup() {
 
     if (success) {
         leds.set_rgb(false, true, false);
+        
+        // Get list of clients
+        HTTPClient http;
+        http.begin("https://api.vibegrow.pro/Device");
+        int response_code = http.GET();
+        if (response_code > 0) {
+            if (response_code == HTTP_CODE_OK) {
+                String payload = http.getString();
+                Serial.println("Received payload:");
+                Serial.println(payload);
+            } else {
+                Serial.print("Received response code: ");
+                Serial.println(response_code);
+            }
+        } else {
+            Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(response_code).c_str());
+        }
     } else {
         leds.set_rgb(true, false, false);
     }
