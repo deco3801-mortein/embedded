@@ -19,6 +19,7 @@
 #include <WebServer.h>
 #include <Preferences.h>
 #include <HTTPClient.h>
+#include <UrlEncode.h>
 
 #define SETUP_BTN_PIN B0
 
@@ -27,8 +28,8 @@ bool success = false;
 
 void receivedMessage(const char *message);
 
-AWS_Credentials credentials{AWS_ROOT_CA1, AWS_CERT, 
-AWS_PRIVATE_KEY, AWS_IOT_ENDPOINT, AWS_IOT_MQTT_PORT, AWS_THING_ID};
+// AWS_Credentials credentials{AWS_ROOT_CA1, AWS_CERT, 
+// AWS_PRIVATE_KEY, AWS_IOT_ENDPOINT, AWS_IOT_MQTT_PORT, AWS_THING_ID};
 
 
 MoistureSensor moistureSensor{MOISTURE_SENSOR_PIN, MOISTURE_MIN_INPUT, MOISTURE_MAX_INPUT};
@@ -52,6 +53,8 @@ Preferences prefs;
 String wifi_ssid;
 String wifi_pass;
 String device_name;
+String device_id;
+bool device_name_changed = false;
 
 static const String page{R"EOF(<!DOCTYPE html>
 <html lang="en">
@@ -90,9 +93,13 @@ void handleForm() {
     wifi_ssid = server.arg("wifissid");
     wifi_pass = server.arg("wifipass");
     device_name = server.arg("devname");
+    device_name_changed = true;
+
     prefs.putString("wifissid", wifi_ssid);
     prefs.putString("wifipass", wifi_pass);
     prefs.putString("devname", device_name);
+    prefs.putBool("devchanged", device_name_changed);
+
     Serial.print("WiFi SSID: ");
     Serial.println(wifi_ssid);
     Serial.print("WiFi pwd: ");
@@ -118,12 +125,14 @@ void setup() {
     button_start = millis();
     button_pressed = false;
     pinMode(LED_RED, INPUT_PULLUP);
+#endif
 
     prefs.begin("vibegrow", false);
     wifi_ssid = prefs.getString("wifissid");
     wifi_pass = prefs.getString("wifipass");
     device_name = prefs.getString("devname");
-#endif
+    device_id = prefs.getString("devid");
+    device_name_changed = prefs.getBool("devchanged", false);
 
     Wire.begin();
     Serial.println("I2C interface intialised.");
@@ -155,31 +164,48 @@ void setup() {
         Serial.println("WiFi SSID or device name not set - please enter setup mode.");
     } else {
         Serial.println("Attempting connection to WIFI & MQTT.");
-        credentials.thing_id = WiFi.macAddress().c_str();
-        success = connectToWiFi(wifi_ssid.c_str(), wifi_pass.c_str()) && setTime() && connectToMQTT_Broker(credentials) 
-        && subscribe(device_name.c_str(), receivedMessage)
-        ;
+        const char* thing_id = WiFi.macAddress().c_str();
+        AWS_Credentials credentials{AWS_ROOT_CA1, AWS_CERT, 
+        AWS_PRIVATE_KEY, AWS_IOT_ENDPOINT, AWS_IOT_MQTT_PORT, thing_id};
+        success = connectToWiFi(wifi_ssid.c_str(), wifi_pass.c_str()) && setTime() && connectToMQTT_Broker(credentials);
     }
 
     if (success) {
         leds.set_rgb(false, true, false);
         
-        // Get list of clients
-        HTTPClient http;
-        http.begin("https://api.vibegrow.pro/Device");
-        int response_code = http.GET();
-        if (response_code > 0) {
-            if (response_code == HTTP_CODE_OK) {
-                String payload = http.getString();
-                Serial.println("Received payload:");
-                Serial.println(payload);
+        // If the device name has changed, we need to create a new device
+        if (device_name_changed) {
+            HTTPClient http;
+            String url = "https://api.vibegrow.pro/Device?name=" + urlEncode(device_name);
+            http.begin(url);
+            // http.addHeader("Content-Type", "text/plain");
+
+            int response_code = http.POST("");
+            if (response_code > 0) {
+                if (response_code == HTTP_CODE_CREATED) {
+                    String payload = http.getString();
+                    // Serial.println("[HTTP] POST... Received payload:");
+                    // Serial.println(payload);
+                    Serial.println("[HTTP] POST... successfully received response.");
+                    JsonDocument doc;
+                    deserializeJson(doc, payload);
+                    const char *did = doc["id"];
+                    device_id = did;
+                    prefs.putString("devid", device_id);
+                    Serial.print("New Device ID: ");
+                    Serial.println(device_id);
+                } else {
+                    Serial.print("[HTTP] POST... failed, received response code: ");
+                    Serial.println(response_code);
+                }
             } else {
-                Serial.print("Received response code: ");
-                Serial.println(response_code);
+                Serial.printf("[HTTP] POST... failed, error: %s\n", http.errorToString(response_code).c_str());
             }
-        } else {
-            Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(response_code).c_str());
+            device_name_changed = false;
+            prefs.putBool("devchanged", device_name_changed);
         }
+
+        subscribe(device_id.c_str(), receivedMessage);
     } else {
         leds.set_rgb(true, false, false);
     }
@@ -272,7 +298,7 @@ void loop() {
         char message[500];
         // Serial.println("sending test message");
         JsonDocument doc;
-        doc["DeviceId"] = AWS_THING_ID;
+        doc["DeviceId"] = device_id;
         doc["Timestamp"] = getTime();
         doc["Moisture"] = moisture;
 #if BOARD_TYPE == 1
