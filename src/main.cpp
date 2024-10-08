@@ -17,13 +17,14 @@
 #include <WiFi.h>
 #include <WiFiAP.h>
 #include <WebServer.h>
+#include <Preferences.h>
 
 #define SETUP_BTN_PIN B0
 
 int delayTime = 1000;
-bool success = true;
+bool success = false;
 
-// void receivedMessage(const char *message);
+void receivedMessage(const char *message);
 
 AWS_Credentials credentials{AWS_ROOT_CA1, AWS_CERT, 
 AWS_PRIVATE_KEY, AWS_IOT_ENDPOINT, AWS_IOT_MQTT_PORT, AWS_THING_ID};
@@ -45,6 +46,11 @@ LEDController leds{};
 WebServer server(80);
 uint32_t button_start;
 bool button_pressed;
+
+Preferences prefs;
+String wifi_ssid;
+String wifi_pass;
+String device_name;
 
 static const String page{R"EOF(<!DOCTYPE html>
 <html lang="en">
@@ -80,7 +86,18 @@ void handleRoot() {
 }
 
 void handleForm() {
-    Serial.println(server.arg("wifissid"));
+    wifi_ssid = server.arg("wifissid");
+    wifi_pass = server.arg("wifipass");
+    device_name = server.arg("devname");
+    prefs.putString("wifissid", wifi_ssid);
+    prefs.putString("wifipass", wifi_pass);
+    prefs.putString("devname", device_name);
+    Serial.print("WiFi SSID: ");
+    Serial.println(wifi_ssid);
+    Serial.print("WiFi pwd: ");
+    Serial.println(wifi_pass);
+    Serial.print("Device name: ");
+    Serial.println(device_name);
     // server.send(200, "text/html", page);
     server.sendHeader("Location", "/");
     server.send(303, "text/plain", "");
@@ -100,6 +117,11 @@ void setup() {
     button_start = millis();
     button_pressed = false;
     pinMode(LED_RED, INPUT_PULLUP);
+
+    prefs.begin("vibegrow", false);
+    wifi_ssid = prefs.getString("wifissid");
+    wifi_pass = prefs.getString("wifipass");
+    device_name = prefs.getString("devname");
 #endif
 
     Wire.begin();
@@ -120,24 +142,29 @@ void setup() {
     uvSensor.init();
     soilTempSensor.init();
     #endif
+
+    linearResonator.set_frequency(300.0);
+    linearResonator.set_intensity(0);
     
 
     Serial.println("Device initialisation complete.");
-    Serial.println("Attempting connection to WIFI & MQTT.");
+    
     leds.set_rgb(true, true, false);
-    success = connectToWiFi(WIFI_SSID, WIFI_PWD) && setTime() && connectToMQTT_Broker(credentials) 
-    // && subscribe(AWS_THING_ID, receivedMessage)
-    ;
+    if (wifi_ssid.isEmpty() || device_name.isEmpty()) {
+        Serial.println("WiFi SSID or device name not set - please enter setup mode.");
+    } else {
+        Serial.println("Attempting connection to WIFI & MQTT.");
+        credentials.thing_id = WiFi.macAddress().c_str();
+        success = connectToWiFi(wifi_ssid.c_str(), wifi_pass.c_str()) && setTime() && connectToMQTT_Broker(credentials) 
+        && subscribe(device_name.c_str(), receivedMessage)
+        ;
+    }
 
     if (success) {
         leds.set_rgb(false, true, false);
     } else {
         leds.set_rgb(true, false, false);
     }
-
-    linearResonator.set_frequency(100.0);
-    linearResonator.set_intensity(0);
-
 }
 
 void loop() {
@@ -250,15 +277,15 @@ void loop() {
 }
 
 
-// void receivedMessage(const char *message) {
-//     JsonDocument doc;
-//     deserializeJson(doc, message);
-//     bool vibrate = doc["Vibrate"];
-//     if (vibrate) {
-//         linearResonator.set_intensity(100);
-//     } else {
-//         linearResonator.set_intensity(0);
-//     }
+void receivedMessage(const char *message) {
+    JsonDocument doc;
+    deserializeJson(doc, message);
+    bool vibrate = doc["Vibrate"];
+    if (vibrate) {
+        linearResonator.set_intensity(100);
+    } else {
+        linearResonator.set_intensity(0);
+    }
 
-//     Serial.println(message);
-// }
+    Serial.println(message);
+}
