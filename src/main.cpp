@@ -20,10 +20,12 @@
 #include <Preferences.h>
 #include <HTTPClient.h>
 #include <UrlEncode.h>
+#include <cmath>
 
 #define SETUP_BTN_PIN B0
 
-int delayTime = 1000;
+// int delayTime = 1000;
+int delayTime = 5000;
 bool success = false;
 
 void receivedMessage(const char *message);
@@ -115,7 +117,8 @@ void setup() {
     uint8_t err;
 
     Serial.begin(115200);
-    while (!Serial) delay(100);
+    // while (!Serial) delay(100);
+    delay(2000);
     Serial.println("Initialising device.");
 
 #if BOARD_TYPE == 0
@@ -282,7 +285,8 @@ void loop() {
             moisture, temperature, light, humidity);
         uint8_t light_level = light / 1000;
         if (light_level > 10) light_level = 10;
-        uint8_t moisture_level = (uint8_t) (moisture / 10.0);
+        float scaler = 10.F / log10f(65535.F);
+        uint8_t moisture_level = (uint8_t) (scaler * log10f(moisture)); //(moisture / 10.0);
         if (moisture_level > 10) moisture_level = 10;
         leds.set_bar(0, light_level);
         leds.set_bar(1, moisture_level);
@@ -307,7 +311,7 @@ void loop() {
         doc["Sunlight"] = light;
 #endif
         doc["Temperature"] = temperature;
-        doc["IsVibrating"] = true;
+        doc["IsVibrating"] = linearResonator.get_intensity() != 0;
         serializeJson(doc, message);
         sendMessage("iot/test", message);
         // frequency = frequency % 300 + 100;
