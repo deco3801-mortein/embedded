@@ -84,7 +84,7 @@ void init_setup_mode()
 
     button_start = millis();
     button_pressed = false;
-    pinMode(SETUP_BTN_PN, INPUT_PULLUP);
+    pinMode(SETUP_BTN_PIN, INPUT_PULLUP);
 }
 
 void check_device_name_change()
@@ -120,12 +120,18 @@ void check_device_name_change()
     }
 }
 
-void update_setup_mode()
+bool update_setup_mode()
 {
+    bool ret = false;
+
     if (button_pressed) {
-        if (digitalRead(LED_RED) != 0) {
+        if (digitalRead(SETUP_BTN_PIN) != 0) {
             button_pressed = false;
-        } else if (millis() - button_start > 2000) {
+            uint32_t duration = millis() - button_start;
+            if (duration > SETUP_BTN_DEBOUNCE_MIN && duration < SETUP_BTN_DEBOUNCE_MAX) {
+                ret = true;
+            }
+        } else if (millis() - button_start > SETUP_BTN_DURATION) {
             Serial.println("Going into setup mode.");
             leds.set_rgb(false, true, true);
             if (!WiFi.disconnect()) {
@@ -133,7 +139,7 @@ void update_setup_mode()
             }
             if (!WiFi.softAP("VibeGrowSetup", "vibegrow1234")) {
                 Serial.println("Soft AP creation failed.");
-                return;
+                return ret;
             }
 
             IPAddress myIP = WiFi.softAPIP();
@@ -144,7 +150,7 @@ void update_setup_mode()
             server.on("/settings", HTTP_POST, handleForm);
             server.begin();
             
-            while (!(millis() - button_start > 5000 && digitalRead(LED_RED) == 0)) {
+            while (!(millis() - button_start > SETUP_BTN_PAUSE && digitalRead(SETUP_BTN_PIN) == 0)) {
                 server.handleClient();
                 delay(2);
             }
@@ -155,9 +161,11 @@ void update_setup_mode()
             ESP.restart(); // Restart the device from scratch
         }
     } else {
-        if (digitalRead(LED_RED) == 0) {
+        if (digitalRead(SETUP_BTN_PIN) == 0) {
             button_pressed = true;
             button_start = millis();
         }
     }
+
+    return ret;
 }

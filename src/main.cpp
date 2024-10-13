@@ -6,32 +6,30 @@
 #include "MoistureSensor.hpp"
 #include "LightSensor.hpp"
 #include "TempHumidSensor.hpp"
-#include "LinearResonator.hpp"
 #include "SoilTempSensor.hpp"
 #include "UVSensor.hpp"
-#include "AdaLRA.hpp"
 #include "LEDController.hpp"
 #include "nano_esp_mqtt.h"
 #include "secrets.h"
 #include "time.h"
 #include "SetupMode.hpp"
 #include "util.hpp"
+#include "VibrationController.hpp"
 
 // Period of time between updates in milliseconds
 #define UPDATE_PERIOD_MS 5000
 
-void receivedMessage(const char *message);
+static void receivedMessage(const char *message);
 
+static MoistureSensor moistureSensor{MOISTURE_SENSOR_PIN, MOISTURE_MIN_INPUT, MOISTURE_MAX_INPUT};
+static VibrationController vibration_controller;
 
-MoistureSensor moistureSensor{MOISTURE_SENSOR_PIN, MOISTURE_MIN_INPUT, MOISTURE_MAX_INPUT};
 #if BOARD_TYPE == 0
-LightSensor lightSensor{LIGHT_SENSOR_ADDR};
-TempHumidSensor tempHumidSensor{DHTPIN};
-LinearResonator linearResonator;
+static LightSensor lightSensor{LIGHT_SENSOR_ADDR};
+static TempHumidSensor tempHumidSensor{DHTPIN};
 #elif BOARD_TYPE == 1
-UVSensor uvSensor{UV_PIN};
-SoilTempSensor soilTempSensor{THERMISTOR_PIN, SOIL_TEMP_FREEZE_INPUT, SOIL_TEMP_ROOM_INPUT};
-AdaLRA linearResonator{ADALRA_PWM_PIN};
+static UVSensor uvSensor{UV_PIN};
+static SoilTempSensor soilTempSensor{THERMISTOR_PIN, SOIL_TEMP_FREEZE_INPUT, SOIL_TEMP_ROOM_INPUT};
 #endif
 
 void setup() {
@@ -43,16 +41,13 @@ void setup() {
     delay(2000);
     Serial.println("Initialising device.");
 
-#if BOARD_TYPE == 0
-    leds.init();
-    leds.set_rgb(true, false, false);
-#endif
-
     Wire.begin();
     Serial.println("I2C interface intialised.");
 
+    leds.init();
+    leds.set_rgb(true, false, false);
     moistureSensor.init();
-    linearResonator.init();
+    vibration_controller.init();
 
 #if BOARD_TYPE == 0
     err = lightSensor.init();
@@ -66,9 +61,6 @@ void setup() {
     uvSensor.init();
     soilTempSensor.init();
 #endif
-
-    linearResonator.set_frequency(300.0);
-    linearResonator.set_intensity(0);
 
     init_setup_mode();
     
@@ -96,7 +88,13 @@ void setup() {
 }
 
 void loop() {
-    update_setup_mode();
+    bool btn_pressed = update_setup_mode();
+
+    if (btn_pressed) {
+        vibration_controller.toggle_override();
+    }
+
+    vibration_controller.update();
 
     checkIncoming();
     if (millis() % UPDATE_PERIOD_MS == 0) {
@@ -147,21 +145,21 @@ void loop() {
         doc["Sunlight"] = uv;
 #endif
         doc["Temperature"] = temperature;
-        doc["IsVibrating"] = linearResonator.get_intensity() != 0;
+        doc["IsVibrating"] = vibration_controller.is_pattern_running();
         serializeJson(doc, message);
         sendMessage("iot/test", message);
     }
 }
 
 
-void receivedMessage(const char *message) {
+static void receivedMessage(const char *message) {
     JsonDocument doc;
     deserializeJson(doc, message);
     bool vibrate = doc["Vibrate"];
     if (vibrate) {
-        linearResonator.set_intensity(100);
+        vibration_controller.start_pattern();
     } else {
-        linearResonator.set_intensity(0);
+        vibration_controller.stop_pattern();
     }
 
     Serial.println(message);

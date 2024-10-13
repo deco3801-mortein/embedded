@@ -44,4 +44,9 @@
 #define SCK_PIN D13
 
 // Setup Mode button
-#define SETUP_BTN_PN LED_RED
+#define SETUP_BTN_PIN LED_RED
+// How to to hold setup button
+#define SETUP_BTN_DURATION 3000
+#define SETUP_BTN_PAUSE (SETUP_BTN_DURATION + 2000)
+#define SETUP_BTN_DEBOUNCE_MIN 100
+#define SETUP_BTN_DEBOUNCE_MAX 1000

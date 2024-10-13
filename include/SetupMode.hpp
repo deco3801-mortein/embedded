@@ -32,5 +32,8 @@ void check_device_name_change();
  * If device enters setup mode, this will close any existing WiFi connection,
  * create a WiFi access point, host the setup webpage, and reset the device
  * once the setup mode button is pressed again.
+ * 
+ * Returns true if a short button press is detected on the setup button (which
+ * can be used for other purposes - e.g. turning vibration on and off).
  */
-void update_setup_mode();
+bool update_setup_mode();
