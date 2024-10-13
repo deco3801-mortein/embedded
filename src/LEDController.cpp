@@ -18,6 +18,8 @@ static const SPISettings settings(100000, MSBFIRST, SPI_MODE0);
 #define MAX7219_DIGIT_6_REG 0x07
 #define MAX7219_DIGIT_7_REG 0x08
 
+LEDController leds{};
+
 LEDController::LEDController() : digit_values{}
 { }
 

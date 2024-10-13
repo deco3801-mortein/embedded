@@ -42,3 +42,6 @@
 #define MOSI_PIN D11
 #define MISO_PIN D12
 #define SCK_PIN D13
+
+// Setup Mode button
+#define SETUP_BTN_PN LED_RED
