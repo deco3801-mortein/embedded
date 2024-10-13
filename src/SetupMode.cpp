@@ -8,6 +8,8 @@
 #include "SetupMode.hpp"
 #include "defines.hpp"
 #include "LEDController.hpp"
+#include "PilserFont.hpp"
+#include "WebPage.hpp"
 
 PersistentVariables persistent_variables;
 static WebServer server(80);
@@ -16,38 +18,14 @@ static Preferences prefs;
 uint32_t button_start;
 bool button_pressed;
 
-static const String page{R"EOF(<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Setup Device</title>
-</head>
-<body>
-    <h1>Set Up Device</h1>
-    <form action="/settings" method="post">
-        <p>
-            <label for="wifissid">WiFi SSID</label>
-            <input type="text" name="wifissid" id="wifissid">
-        </p>
-        <p>
-            <label for="wifipass">WiFi Password</label>
-            <input type="text" name="wifipass" id="wifipass">
-        </p>
-        <p>
-            <label for="devname">Device Name</label>
-            <input type="text" name="devname" id="devname">
-        </p>
-        <p>
-            <input type="submit" value="Set">
-        </p>
-    </form>
-</body>
-</html>)EOF"};
-
 static void handleRoot()
 {
-    server.send(200, "text/html", page);
+    server.send(200, "text/html", web_page);
+}
+
+static void handleFont()
+{
+    server.sendContent((char*) pilser_font, pilser_font_size);
 }
 
 static void handleForm()
@@ -148,6 +126,7 @@ bool update_setup_mode()
 
             server.on("/", handleRoot);
             server.on("/settings", HTTP_POST, handleForm);
+            server.on("/static/Pilser.otf", handleFont);
             server.begin();
             
             while (!(millis() - button_start > SETUP_BTN_PAUSE && digitalRead(SETUP_BTN_PIN) == 0)) {
