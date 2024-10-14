@@ -2,7 +2,7 @@
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
-
+#include "LEDController.hpp"
 #include "nano_esp_mqtt.h"
 
 const u_long TIMEOUT = 10000;
@@ -45,6 +45,7 @@ bool connectToWiFi(const char *ssid, const char *pwd) {
     while (WiFi.status() != WL_CONNECTED && millis() < start + TIMEOUT) {
         Serial.print(".");
         delay(500);
+        leds.toggle_rgb(true, true, false);
     }
 
     if (WiFi.status() == WL_CONNECTED) {
@@ -66,6 +67,7 @@ bool setTime() {
     time_t now = time(nullptr);
     while (now < 1510592825) {
         delay(500);
+        leds.toggle_rgb(true, true, false);
         Serial.print(".");
         time(&now);
     }
@@ -77,7 +79,7 @@ bool setTime() {
 
 const char *getTime() {
     time_t now = time(nullptr);
-    strftime(timestamp, MAX_TIMESTAMP_LENGTH, "%Y-%m-%d %H:%M:%S", localtime(&now));
+    strftime(timestamp, MAX_TIMESTAMP_LENGTH, "%Y-%m-%dT%H:%M:%SZ", localtime(&now));
     return timestamp;
 }
 
@@ -102,6 +104,7 @@ bool connectToMQTT_Broker(AWS_Credentials credentials) {
     while (!mqttClient.connected() && millis() < start + TIMEOUT) {
         Serial.print(".");
         delay(500);
+        leds.toggle_rgb(true, true, false);
     }
 
     if (mqttClient.connected()) {
