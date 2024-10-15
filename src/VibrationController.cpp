@@ -50,6 +50,14 @@ void VibrationController::stop_pattern()
     pattern_running = false;
 }
 
+void VibrationController::toggle_pattern()
+{
+    pattern_running = !pattern_running;
+    if (pattern_running) {
+        pattern_start = millis();
+    }
+}
+
 bool VibrationController::is_pattern_running()
 {
     return pattern_running;
