@@ -27,6 +27,10 @@ public:
      */
     void stop_pattern();
     /**
+     * Toggle the pest control vibration pattern on/off.
+     */
+    void toggle_pattern();
+    /**
      * Return true if the pattern is running, false otherwise.
      */
     bool is_pattern_running();

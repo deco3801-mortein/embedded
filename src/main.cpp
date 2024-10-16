@@ -155,11 +155,9 @@ void loop() {
 static void receivedMessage(const char *message) {
     JsonDocument doc;
     deserializeJson(doc, message);
-    bool vibrate = doc["Vibrate"];
-    if (vibrate) {
-        vibration_controller.start_pattern();
-    } else {
-        vibration_controller.stop_pattern();
+    String type = doc["Type"];
+    if (type == "ToggleVibration") {
+        vibration_controller.toggle_pattern();
     }
 
     Serial.println(message);
