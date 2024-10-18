@@ -17,7 +17,8 @@
 #include "VibrationController.hpp"
 
 // Period of time between updates in milliseconds
-#define UPDATE_PERIOD_MS 5000
+// #define UPDATE_PERIOD_MS 5000
+#define UPDATE_PERIOD_MS 1000
 
 static void receivedMessage(const char *message);
 
